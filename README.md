@@ -52,4 +52,19 @@ Finalmente, para ejecutar la aplicación y poner en marcha el asistente virtual,
 streamlit run .\src\app.py
 ```
 
+## 5. Crear archivo de configuración `.env`
+
+Para almacenar de manera segura las credenciales de la API y el correo electrónico para enviar mensajes, crea un archivo llamado `.env` en la raíz de tu proyecto. Este archivo contendrá la clave de la API de OpenAI y la contraseña de la cuenta de correo electrónico.
+
+1. Crea el archivo `.env` y agrega el siguiente contenido como ejemplo:
+
+    ```plaintext
+    OPENAI_API_KEY=sk-exampleAPIkey1234567890abcdef
+    PASSWORD=abcd efgh ijkl mnop
+    ```
+
+   - `OPENAI_API_KEY` es un ejemplo de la clave de acceso a la API de OpenAI, necesaria para interactuar con sus servicios.
+   - `PASSWORD` es una clave de aplicación específica que permite a la cuenta de correo electrónico enviar correos.
+
+
 
