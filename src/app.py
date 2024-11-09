@@ -7,7 +7,10 @@ import pandas as pd
 import io
 from RestrictedPython import compile_restricted, safe_globals
 from RestrictedPython.Eval import default_guarded_getitem, default_guarded_getattr
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+#nuevas librerias 30/10/2024
 from datetime import datetime
+import traceback
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import (
@@ -36,13 +39,17 @@ import ssl
 import smtplib
 import time
 #Nueva libreria:
-from langgraph.prebuilt import create_react_agent
 import unicodedata
-import seaborn as sns
+from langgraph.prebuilt import create_react_agent
+from langgraph.prebuilt import create_react_agent
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+    
+from langgraph.prebuilt import ToolNode
 #-----------------------------------------------------------------------
 
 
 #Variables globales
+fecha = datetime.now().date()
 filtro_df = pd.DataFrame() #dataframe global que guarda los filtros de consulta_df
 mensaje_creado = "" #str global que guarda el mensaje creado por create_email
 asunto_creado = "" #str global que guarda el asunto creado por create_email
@@ -68,7 +75,9 @@ if 'bandera' not in st.session_state:
 if 'file' not in st.session_state:
     st.session_state["file"] = False
 
-# Funciones:
+#fecha para obtner la fcha actual del día
+def get_current_date():
+    return datetime.now().date()
 
 # Función para eliminar acentos de una cadena o una columna de DataFrame
 def remove_accents(data):
@@ -102,17 +111,19 @@ def consulta_df(codigo):
     lo que previene la ejecución de código malicioso y garantiza la integridad del sistema. 
     Esta función está diseñada para ser flexible y accesible, permitiendo a los usuarios 
     realizar operaciones personalizadas adaptadas a sus necesidades específicas.
+    Manda igual el df, o consultas completas para que el usuario pueda observarlas.
     """
     
     try:
+        # resultado = df[(df['asignatura'].str.contains(remove_accents('Propedeutico de Matematicas'), case=False) | df['asignatura'].str.contains(remove_accents('Calculo Diferencial'), case=False)) & (df['año'] < fecha.year - 2)]
+        # print(resultado)
+        # Mostrar resultados
         codigo_preprocesado = preprocesar_codigo(codigo)
-
         # Compilar el código de forma restringida
         byte_code = compile_restricted(codigo_preprocesado, '<string>', 'exec')
         
         # Ejecutar el código
         exec(byte_code, namespace)
-        
         # Acceder a los resultados
         resultado = namespace.get('res')
         #guardar res 
@@ -120,6 +131,8 @@ def consulta_df(codigo):
 
         # Verificar si el resultado es un DataFrame o Series
         if isinstance(resultado, (pd.DataFrame, pd.Series)):
+
+            st.dataframe(resultado)
             st.session_state["filtro_df"] = pd.DataFrame()  # Vaciar el dataframe
             
             try:
@@ -133,11 +146,15 @@ def consulta_df(codigo):
             # Eliminar duplicados de la columna 'matricula'
             alumnos_unicos = nuevo_resultado.drop_duplicates(subset='matricula', keep='first')
             st.session_state["filtro_df"] = alumnos_unicos.copy()
-
         return resultado
     except KeyError as e:
         return f"Error: La columna {str(e)} no se encuentra en el DataFrame."
     except Exception as e:
+        # print("Error al ejecutar código:")
+        # print(traceback.format_exc())
+        
+        # Muestra el estado de `namespace` para depurar
+        # print("Estado actual de `namespace`:", namespace)
         print(f"Error al ejecutar código: {e.__class__.__name__}: {e}")
         return "No fue posible ejecutar el código!!"
 
@@ -154,7 +171,7 @@ def create_graph(code: str):
     """
 
     res =  st.session_state["res"] 
-    print("indices", res.shape)
+    #print("indices", res.shape)
     # Asegura que realice graficas
     if "plt." in code and "plt.show()" not in code:
         code += "\nplt.show()"
@@ -186,7 +203,8 @@ def create_email(mensaje,asunto):
            Le recomendamos asistir a las asesorías para mejorar su rendimiento.\n\n Saludos,\n Equipo Académico\n '
   
     """ 
-    print("entra",st.session_state["bandera"])
+    print("ENTRO A CREATE_EMAIL",st.session_state["bandera"])
+
 
     # global mensaje_creado, asunto_creado
     st.session_state["mensaje_creado"] = mensaje
@@ -195,13 +213,12 @@ def create_email(mensaje,asunto):
     #Unir el mensaje con su asunto
     mensaje_con_asunto = asunto + "\n\n" + mensaje
     st.session_state["bandera"] = True 
-
-    print("Salida", st.session_state["confirmar"])
-    print("sale",st.session_state["bandera"])
+    print(mensaje_con_asunto)
     return mensaje_con_asunto
 
 def send_email():
     print("Entro PAPUS")
+    print(st.session_state["filtro_df"])
     filtro_df = st.session_state["filtro_df"]
     mensaje_creado = st.session_state["mensaje_creado"]
     asunto_creado = st.session_state["asunto_creado"]
@@ -272,6 +289,15 @@ def cargar_archivo_csv():
         if uploaded_file is not None:
             # Leer el archivo CSV
             df = pd.read_csv(uploaded_file)
+            #agregar año
+            df['año'] = df['periodo'].str[:4]
+            df['año'] = df['año'].astype(int)
+            #agregar periodo_int
+            df['periodo_int'] = df['periodo'].str[:6]
+            df['periodo_int'] = df['periodo_int'].astype(int)  
+
+            #quitar acentos
+            df['asignatura'] = remove_accents(df['asignatura'])
             st.session_state.df = df
 
             # Actualizar estado de archivo cargado
@@ -299,6 +325,7 @@ def mensajes_anteriores():
         if msg.get("graph") is not None:
             st.image(msg["graph"])
 
+
 #----------------------------------------------------------------------------------------------
 
 # Configuración de la página
@@ -308,6 +335,7 @@ st.set_page_config(
     page_title="Asistente", 
     page_icon="./img/coco2.png",
 )
+
 
 
 st_callback = StreamlitCallbackHandler(st.container())
@@ -326,416 +354,288 @@ avatares = {
     "user": "./img/user2.png"
 }
 
+# Título de la aplicación
+st.title(f"*Tu Aliado Académico*")
+# Insertar CSS personalizado para efecto de resplandor
+st.markdown(
+    """
+    <style>
+    .body{
+        background: white; 
+    }
+    .st-emotion-cache-janbn0 {
+        border: 1px solid transparent;
+        padding: 10px 15px; /* Ajustamos padding para dejar espacio */
+        margin: 0px 7px;
+        max-width: 50%;
+        margin-left: auto;
+
+        background: #2F2F2F;
+        color: white;
+        border-radius: 20px;
+
+        flex-direction: row-reverse;
+        text-align: justify;
+    }
+
+    .st-emotion-cache-janbn0 p {
+        margin-top: 0.5em;   /* Pequeño margen arriba */
+        margin-bottom: 0.5em; /* Pequeño margen abajo */
+        text-align: justify;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
-# Usar el estado de la sesión para rastrear la página actual
-if 'page' not in st.session_state:
-    st.session_state.page = 'home'
 
-# Pasar a la ventana home
-def home():
-    st.session_state.page = 'home'
-
-# Para pasar a la ventana tutorial
-def tutorial():
-    st.session_state.page = 'tutorial'
+# Barra lateral (sidebar) con información del asistente
+with st.sidebar:
+    st.image("./img/cocodrilo.png", use_column_width=True, channels="RGB", output_format="auto", width="auto")
+    st.sidebar.markdown("---")
     
-if st.session_state.page == 'home':
-    # Título de la aplicación
-    st.title(f"*Tu Aliado Académico*")
-    # Insertar CSS personalizado para efecto de resplandor
-    st.markdown(
-        """
-        <style>
-        .body{
-            background: white; 
-        }
-        .st-emotion-cache-janbn0 {
-            border: 1px solid transparent;
-            padding: 5px 10px;
-            margin: 0px 7px;
-            max-width: 50%;
-            margin-left: auto;
+    # Usar un key fijo pero modificado para evitar duplicados
+    # value_show_basic_info = False
+    # if st.session_state["bandera"] == True:
+    #     value_show_basic_info = False
+    
 
-            background: #2F2F2F;
-            color: white;
-            border-radius: 20px;
-
-            flex-direction: row-reverse;
-            text-align: right;
-            
-        }
-
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # Barra lateral (sidebar) con información del asistente
-    with st.sidebar:
-        st.image("./img/cocodrilo.png", use_column_width=True, channels="RGB", output_format="auto", width="auto")
-        st.sidebar.markdown("---")
-        
-        # Usar un key fijo pero modificado para evitar duplicados
-        # value_show_basic_info = False
-        # if st.session_state["bandera"] == True:
-        #     value_show_basic_info = False
-        
 
     
-        
-        st.sidebar.markdown(f"""
-                ### ¡Hola! 👋 Soy Pedro 🐊. ¡Bienvenido! 😄
-                """)
-        st.sidebar.markdown("---")
-        col1, col2 = st.columns(2)
-        col1.subheader("Mejora tu experiencia 🚀")
-        if st.button("Ver Tutorial",type="primary", on_click=tutorial):
-            pass
-        st.sidebar.markdown("---")
+    st.sidebar.markdown(f"""
+            ### ¡Hola! 👋 Soy Pedro 🐊. ¡Bienvenido! 😄
+            """)
+    st.sidebar.markdown("---")
 
-    # Inicializar mensajes y estado de archivo
-    if "messages" not in st.session_state:
-        st.session_state["messages"] = []
-        st.session_state["messages"] = [{"role": "assistant", "content": f"👋 Hola, soy {assistant_name}."}]
+# Inicializar mensajes y estado de archivo
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
+    st.session_state["messages"] = [{"role": "assistant", "content": f"👋 Hola, soy {assistant_name}."}]
 
-    if st.session_state.get("messages"):
-                mensajes_anteriores()  
+if st.session_state.get("messages"):
+            mensajes_anteriores()  
 
 
-    if "file_uploaded" not in st.session_state:
-        st.session_state["file_uploaded"] = False
+if "file_uploaded" not in st.session_state:
+    st.session_state["file_uploaded"] = False
 
-        
-    if "df" not in st.session_state:
-        st.session_state["df"] = None
-        
-
-
-    df = cargar_archivo_csv()
-
-
-    # Si el archivo se subio comenzamos a chatear   
-    if st.session_state["file_uploaded"]:
-        if "snow_displayed" not in st.session_state:
-            st.snow()
-            st.session_state["snow_displayed"] = True  # Set the flag to indicate that st.snow() has been displayed
-            
-        df = st.session_state.get('df', None)
-        # Espacio de nombres seguro
-        namespace = safe_globals.copy()
-        namespace['_getattr_'] = default_guarded_getattr
-        namespace['_getitem_'] = default_guarded_getitem
-        namespace['__builtins__'] = None  # Deshabilitar acceso a built-ins inseguros
-        namespace['pd'] = pd  # Permitir uso de pandas
-        namespace['df'] =  df  # Permitir acceso al DataFrame
-        namespace['remove_accents'] = remove_accents
-
-        from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-
-        template = """
-            Considera que eres un asistente que apoya a un usuario a realizar consultas en una tabla de datos 
-            empleando código Python con la librería pandas. La tabla de datos se identifica con la variable df y
-            guarda calificaciones de estudiantes en diferentes cursos. La tabla contiene las siguientes columnas:
-            - 'matricula': variable categórica que identifica de forma única a un estudiante.
-            - 'p1': variable numérica que indica la calificación del estudiante en el primer periodo parcial de la asignatura.
-            - 'p2': variable numérica que indica la calificación del estudiante en el segundo periodo parcial de la asignatura.
-            - 'p3': variable numérica que indica la calificación del estudiante en el tercer periodo parcial de la asignatura.
-            - 'final': variable numérica que indica la calificación final del estudiante en la asignatura.
-            - 'alumno': variable categórica que guarda el nombre del estudiante.
-            - 'clave_asig': variable categórica que indica un ID para una asignatura.
-            - 'asignatura': variable categórica que indica el nombre de la asignatura o materia.
-            - 'seccion': variable categórica que indica la sección de la asignatura de tipo entero.
-            - 'periodo': variable categórica que indica el periodo en que se imparte la asignatura.
-            - 'num_docente': variable categórica que identifica al profesor de la asignatura.
-            - 'docente': variable categórica que guarda el nombre del profesor de la asignatura.
-
-            Para determinar el estado de aprobación de un estudiante en una asignatura, se considera lo siguiente:
-            - Un estudiante aprueba si su calificación final, calculada como el promedio de 'p1', 'p2' y 'p3', es mayor o igual a 7.
-            - Un estudiante reprueba si su calificación final es menor a 7.
-
-            Los datos de un estudiante pueden distribuirse en varias filas, ya que puede haber cursado varias asignaturas, por lo que 
-            una misma matrícula puede estar presente en varias filas. Para evaluar las tasas de reprobación de una asignatura, debes identificar el total de registros de la asignatura con calificación menor 
-            a 7 y dividirlo por el total de registros de la asignatura.
-
-            El resultado final de la consulta debe guardarse en una variable llamada 'res'. Por ejemplo, 
-            si el usuario necesita conocer el total de estudiantes en la tabla, el código que debes generar es: 
-            res = df['matricula'].nunique(). Otro ejemplo, si la consulta busca conocer la tasa de reprobación por asignatura, el código sería: 
-            res = df[df['final'] < 7].groupby('clave_asig')['final'].count() / df.groupby('clave_asig')['final'].count().
-            La última línea de código siempre debe asignar el resultado a la variable 'res'; de lo contrario, obtendrás resultados incorrectos.
-
-            Solo usa la herramienta create_email cuando el usuario desea crear o escribir un mensaje. Por ejemplo,
-            en la siguiente consulta no se menciona nada sobre escribir o enviar un mensaje: 
-            "realiza una gráfica de los alumnos reprobados y no reprobados de la materia de ecuaciones diferenciales".
-            Considera que al crear mensajes, si el usuario se refiere a una columna, debes incluirla de la variable df entre corchetes. Por ejemplo,
-            el mensaje podría ser: 'su calificación en {{asignatura}} es de {{p1}}'.
-
-            Si el usuario desea enviar un mensaje o correo, realiza un invoke de create_email. 
-            Si el usuario solo escribe 'enviar un mensaje' o algo similar, también realiza un invoke de create_email.
-
-            Siempre que el usuario se refiera a hacer una gráfica solo invoke create_graph,
-            Si el usuario desea generar, realizar o crear una gráfica, invoke la herramienta create_graph.
-            Por ejemplo, si la consulta busca generar una gráfica de los alumnos reprobados y no reprobados de ecuaciones diferenciales, 
-            realiza invoke de create_graph, ten en cuenta que existen diferentes tipos de graficas, por ejemplo histogramas.
-
-            Considera que cuentas con una función definida remove_accents() que permite quitar acentos de las columnas del df y de strings. 
-            Por ejemplo, si el usuario desea conocer los alumnos reprobados en los parciales 1 y 2 de cálculo, el código sería:
-            df[(df['p1'] < 7) | (df['p2'] < 7)].loc[remove_accents(df['asignatura']).str.contains(remove_accents('Cálculo'), case=False)].
-            Usa remove_accents tanto en el df en la columna de asignatura como en la palabra 'Cálculo' para que la búsqueda no se vea afectada por acentos.
-
-            Al realizar consultas de la base de datos o generar gráficas, si se está buscando una palabra específica, utiliza str.contains() con case=False
-            para encontrar patrones similares a la palabra que se busca, y realiza búsquedas sin distinción entre mayúsculas y minúsculas.
-            Ten en cuenta que algunas asignaturas pueden tener nombres largos que incluyen conjunciones o preposiciones, por lo cual siempre considera
-            todas las palabras que puedan ser parte del nombre de la asignatura. 
-
-            Recuerda que es importante utilizar el nombre completo de la materia al usar str.contains().
-            siempre usa str.contains() en periodo para encontrar patrones deacuerdo a la consulta, ejemplo (df['periodo'].str.contains('202301', case=False),
-            siempre usalo en comparaciones.
-        """
-
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", template),
-            ("user", "Tu consulta actual es: {input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ])
-        from langgraph.prebuilt import create_react_agent
-        from langchain.agents import AgentExecutor, create_tool_calling_agent
-        
-        from langgraph.prebuilt import ToolNode
-
-        
-        
-        
-        tools = [consulta_df,create_graph,create_email]
-        tool_node = ToolNode(tools)
-        
-        llm_chat = ChatOpenAI(temperature=0, streaming=True)
-        
-        llm_chat = llm_chat.bind_tools(tools)
-        
-        agent = create_tool_calling_agent(llm_chat, tools, prompt=prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=tools)
-        
-        
-        
-        if prompt := st.chat_input("Escribe tu mensaje aquí..."):
-            print("holis",prompt)
-            # Chat del usuario para el asistente
-            st.session_state["messages"].append({"role": "user", "content": prompt})
-            st.chat_message("user", avatar=avatares["user"]).write(prompt)
-            
-            # Ejecutar la consulta y guardar la respuesta del asistente
-            with st.chat_message("assistant", avatar=avatares["assistant"]):
-
-                st_callback = StreamlitCallbackHandler(st.container())
-                
-                #Muestra todo el profeso de lenguaje natural
-                response = agent_executor.invoke(
-                    {"input": prompt}, {"callbacks": [st_callback]}
-                )
-                
-                #Solo muestre respuesta
-                #response = agent_executor.invoke({"input": prompt})
-                
-                # Asegúrate de que la respuesta esté definida
-                if 'output' in response:
-                    # if st.session_state["bandera"] == True:
-                    #    message_content = (
-                    #         f"**Asunto:** {st.session_state['asunto_creado']}\n\n"
-                    #         f"**Mensaje:**\n\n{st.session_state['mensaje_creado']}\n\n"
-                    #         f"{response['output']}"
-                    #     )
-                    # else: 
-                    #     message_content = response["output"]
-                    message_content = response["output"]
-                else:
-                    message_content = "No se obtuvo respuesta del asistente."
-
-                current_graph = st.session_state.get("current_graph", None)
-                
-                st.session_state["messages"].append({"role": "assistant", "content": message_content, "graph": current_graph}
-                )
-
-                st.write(message_content)
-                # if st.session_state["bandera"] == True:
-                #     st.experimental_rerun()  
-
-                        
-                if current_graph:
-                    st.image(current_graph)
-
-                # Limpiar la gráfica actual para no mostrarla en futuros mensajes
-                st.session_state["current_graph"] = None  
-                
-        if st.session_state.get("bandera", False):
-            st.write("¿Confirmar envío de mensajes?")
-            
-            # Botones de confirmación
-            col1, col2 = st.columns([.1,.7])  # Crear dos columnas para los botones
-
-            with col1:
-                if st.button("Sí", key="confirmar_si"):
-                    send_email()  # Llamada a la función de envío de email
-                    st.success("Has confirmado el envío de mensajes.")
-                    st.session_state['bandera'] = False  # Resetear bandera
-
-            with col2:
-                if st.button("No", key="confirmar_no",type="primary"):
-                    st.warning("Has cancelado el envío de mensajes.")
-                    st.session_state['bandera'] = False  # Resetear bandera
-        
-    else:
-            st.error("Por favor, sube primero el archivo CSV para poder interactuar con el asistente.",icon="⚠️")    
-
-
-elif st.session_state.page == 'tutorial':
-    st.markdown(
-        """
-        <style>
-        .body{
-            background: white; 
-        }
-        .st-emotion-cache-janbn0 {
-            border: 1px solid transparent;
-            padding: 5px 10px;
-            margin: 0px 7px;
-            max-width: 50%;
-            margin-left: auto;
-
-            background: #2F2F2F;
-            color: white;
-            border-radius: 20px;
-
-            flex-direction: row-reverse;
-            text-align: right;
-            
-        }
-
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    if st.button("Regresar", type="primary", on_click=home):
-        pass
-    with st.sidebar:
-        st.image("./img/cocodrilo.png", use_column_width=True, channels="RGB", output_format="auto", width="auto")
-        st.sidebar.markdown("---")
-        show_basic_info = st.sidebar.checkbox("Mostrar interacciones", value=False)
-        if show_basic_info:
-            st.sidebar.markdown(f"""
-                ### Interacciones del asistente virtual:
-                - *Analizar calificaciones*: Sube un archivo csv con las calificaciones de los estudiantes y el asistente las procesará automáticamente.
-                - *Generar reportes*: El asistente puede crear reportes automáticos basados en los datos de los estudiantes.
-                - *Identificar estudiantes en riesgo*: El asistente revisa los datos para identificar estudiantes que podrían estar en riesgo académico.
-                - *Responder preguntas*: Haz preguntas sobre los datos cargados o pide ayuda con tareas académicas relacionadas.
-                """)
-        # Usar un key fijo pero modificado para evitar duplicados
-        # value_show_basic_info = False
-        # if st.session_state["bandera"] == True:
-        #     value_show_basic_info = False
-        
     
-    st.write("### **Instrucciones de uso: 🕵️‍♂️**")
-    with st.expander(
-    "Intrucciones del asistente virtual Pedro", expanded=False
-    ):
-        
-        st.write("""
-        ### **Bienvenido al asistente virtual Pedro**  
-        Este asistente está diseñado para ayudarte a consultar y analizar las calificaciones de estudiantes almacenadas en una tabla de datos usando Python con la librería pandas. Aquí tienes una lista de las funcionalidades que puedes utilizar:
-
-        ### Funciones principales:
-        
-        1. **Realizar consultas sobre los datos**:
-            - Puedes pedirle al asistente que realice diferentes tipos de consultas sobre los datos de las calificaciones. 
-            - Ejemplo: _"Muestra los estudiantes reprobados en la asignatura de cálculo."_
-            - Ejemplo: _"¿Cuántos estudiantes han aprobado el primer parcial de ecuaciones diferenciales?"_
-        
-        2. **Generar gráficos**:
-            - Puedes solicitarle al asistente que genere gráficos para visualizar los datos. 
-            - Ejemplo: _"Genera una gráfica de barras de los alumnos reprobados y aprobados en álgebra lineal."_
-            - Ejemplo: _"Muestra un gráfico de líneas con las calificaciones finales de todos los estudiantes en la asignatura de física."_
-
-        3. **Enviar mensajes personalizados**:
-            - El asistente puede generar y enviar mensajes basados en la información de las calificaciones de los estudiantes.
-            - Ejemplo: _"Envía un correo a los estudiantes que reprobaron el segundo parcial de programación."_
-            - Ejemplo: _"Genera un mensaje para informar a los estudiantes sus calificaciones finales en álgebra."_
-
-        4. **Cálculo de tasas de reprobación**:
-            - Puedes calcular la tasa de reprobación de una asignatura con base en las calificaciones finales.
-            - Ejemplo: _"Calcula la tasa de reprobación de cálculo."
-            
-        ### Instrucciones adicionales:
-        **Variables que maneja el asistente**:
-        
-        - 'matricula': Identificación única del estudiante.
-        - 'p1', 'p2', 'p3': Calificaciones de los parciales 1, 2 y 3.
-        - 'final': Calificación final (promedio de p1, p2, p3).
-        - 'alumno': Nombre del estudiante.
-        - 'clave_asig': ID único de la asignatura.
-        - 'asignatura': Nombre de la asignatura.
-        - 'seccion': Sección de la asignatura.
-        - 'periodo': Periodo académico de la asignatura.
-        - 'num_docente': Identificación del docente.
-        - 'docente': Nombre del docente.
-            
-        ### Ejemplos de consultas comunes:
+if "df" not in st.session_state:
+    st.session_state["df"] = None
     
-        - _"¿Cuántos estudiantes reprobaron el primer parcial de álgebra?"_
-        - _"Genera una gráfica de pastel de los estudiantes aprobados y reprobados en física."_
-        - _"Envía un mensaje a los estudiantes que tienen una calificación final menor a 7 en ecuaciones diferenciales."_  
 
-        Si necesitas más ayuda, simplemente pregunta al asistente sobre lo que quieras consultar o realizar.
-        """)
-    st.write("")
-    st.write("### **Casos de uso** 📈")        
 
-    option = st.selectbox(
-        "Selecciona 👇",
-        ["Selecciona una opción", "Consultas", "Generaracion de graficas"]
-    )
+df = cargar_archivo_csv()
 
-    if option == "Consultas":
-        st.write("Haz seleccionado Consultas")
-        
 
-        st.chat_message("user", avatar=avatares["user"]).write("Lista de la tasa de reprobacion de cada asignatura")
+# Si el archivo se subio comenzamos a chatear   
+if st.session_state["file_uploaded"]:
+    df = st.session_state.get('df', None)
+    # Espacio de nombres seguro
+    namespace = safe_globals.copy()
+    namespace['_getattr_'] = default_guarded_getattr
+    namespace['_getitem_'] = default_guarded_getitem
+    namespace['__builtins__'] = None  # Deshabilitar acceso a built-ins inseguros
+    namespace['pd'] = pd  # Permitir uso de pandas
+    namespace['df'] =  df  # Permitir acceso al DataFrame
+    namespace['datetime'] = datetime  # Permitir acceso controlado a datetime
+    namespace['fecha'] = fecha #permitir acceso a la variable fecha
+    namespace['remove_accents'] = remove_accents 
+    namespace['get_current_date'] = get_current_date
     
+    tools = [consulta_df, create_graph, create_email]
+    tool_node = ToolNode(tools)
+
+    llm_chat = ChatOpenAI(temperature=0, streaming=True)
+    #llm_chat = llm_chat.bind_tools(tools)
+
+    template = """
+    Eres un asistente que apoya al usuario a realizar consultas y análisis de datos académicos, gestionando información sobre calificaciones de estudiantes. 
+    Además, puedes generar gráficos y enviar correos electrónicos según se requiera. La tabla de datos se identifica con la variable df y contiene las siguientes columnas:
+    - 'matricula': variable categórica que identifica de forma única a un estudiante.
+    - 'p1', 'p2', 'p3': variables numéricas que indican las calificaciones del estudiante en los periodos parciales de la asignatura.
+    - 'final': variable numérica que indica la calificación final del estudiante en la asignatura.
+    - 'alumno': variable categórica con el nombre del estudiante.
+    - 'clave_asig': variable categórica que indica un ID para una asignatura.
+    - 'asignatura': variable categórica con el nombre de la asignatura.
+    - 'seccion': variable categórica que indica la sección de la asignatura.
+    - 'periodo': variable categórica que indica el periodo lectivo.
+    - 'num_docente': variable categórica que identifica al profesor de la asignatura.
+    - 'docente': variable categórica con el nombre del profesor.
+    - 'año': variable numérica que indica el año en el cual se curso o se esta cursando la asignatura.
+    - 'periodo_int': variable numerica que indica el periodo lectivo.
+    ### la  columna asignatura
+    - la base de datos contiene la columna 'asignatura' la cua lcorresponde a una asignatura o materia.
+    - una asignatura puede estar escritas con acentos, mayusculas y minusculas.
+    - Considera que cuentas con una función definida remove_accents() que permite quitar acentos de las columnas del df y de strings, 
+      Por ejemplo, si el usuario desea conocer los alumnos reprobados en los parciales 1 y 2 de cálculo, el código sería:
+      df[(df['p1'] < 7) | (df['p2'] < 7)].loc[df['asignatura'].str.contains(remove_accents('Cálculo'), case=False)],
+      En el ejemplo se usa remove_accents en la palabra 'Cálculo' para que la búsqueda no se vea afectada por acentos.
+
+
+    ### la columna 'periodo'
+    # - la base de datos contiene la columna 'periodo' la cual esta conformada por "año" - "periodo del año" - "estación". 
+    - ejemplo de periodo "201503", el año es "2015", el periodo del año es "03" y la estación es "otoño"
+    - El periodo tiene tres estaciones o temporadas, Primavera = 01, Verano = 02, Otoño = 03.
+    - El periodo igual contiene el nombre de la estación, ejemplo "202301 Primavera", contiene la estación primavera.
+    - para hacer comparaciones de periodo con datos numeros utiliza la columna periodo_int, la columna contiene el año y el periodo del año,
+      ejemplo: 202101, "2021" es el año y "01" el periodo del año.
+    - Para conocer el periodo actual o semestre actual utiliza df['periodo_int'].max().
+    - el periodo tambien se le puede referir al ciclo.
+     
+
+    ### Criterios de Evaluación
+    - Un estudiante aprueba si su calificación final es mayor o igual a 7 (promedio de 'p1', 'p2', 'p3').
+    - Un estudiante reprueba si su calificación final es menor a 7.
+    
+    ### Herramientas Disponibles:
+    - **consulta_df**: Solo para consultas de datos.
+    - **create_graph**: Solo para generar gráficos.
+    - **create_email**: Solo para escribir correos y enviar correos electrónicos.
+
+    ### Instrucciones Generales:
+    1. **Consultas**:
+        - Para realizar consultas, asegúrate de proporcionar código claro y eficiente, usando operaciones de pandas. El resultado final de la consulta debe asignarse a 'res'.
+        - Usa `remove_accents()` para búsquedas de texto que puedan incluir acentos.
+        - Siempre que se busque un término específico en una columna, usa `str.contains()` con `case=False` para asegurar la búsqueda sin distinción de mayúsculas/minúsculas.
+        - Cuando se necesite filtrar por periodo, usa `str.contains()` para permitir buscar patrones específicos, ejemplo: `df['periodo'].str.contains('202401', case=False)`.
+        - Para listas de estudiantes o datos tabulares, muestra el resultado con `st.session_state.get("res")`.
+        - Usa df['año'].max() si necesitas conocer el año actual.
+
+    2. **Gráficos**:
+        - Usa `create_graph` para generar gráficos. Indica el tipo de gráfico (barras, histogramas, cajas, series de tiempo) y asegúrate de que sea adecuado para el análisis solicitado.
+        - Ejemplo: si se requiere una gráfica de barras que muestre la tasa de reprobación, usa `create_graph` para construir dicha gráfica.
+
+    3. **Correos Electrónicos**:
+        - Usa `create_email` cuando se mencione explícitamente la creación o envío de correos electrónicos, o si el usuario hace referencia a contactar a alguien.
+        - Los mensajes deben ser personalizados. Por ejemplo: "Hola {{alumno}}, notamos que tu calificación en {{asignatura}} es {{final}}. Te recomendamos..."
+        - Asegúrate de presentar el correo para aprobación antes de proceder con el envío.
+    
+
+    ### Ejemplos de Consultas y Casos de Uso:
+    1. **Detección de estudiantes en riesgo**:
+        - "Lista a los estudiantes que estén cursando alguna asignatura en el periodo 2024-01, y que hayan reprobado la misma asignatura en periodos previos; además, que en el periodo actual tengan algún parcial reprobado en esa misma asignatura."
+            Código: `res = df[(df['periodo'].str.contains('202401', case=False)) & ((df['p1'] < 7) | (df['p2'] < 7) | (df['p3'] < 7)) & (df['clave_asig'].duplicated(keep=False))]`
+        - "Genera una lista de estudiantes de la cohorte 2022 con una probabilidad de deserción escolar mayor a 0.3."
+            Código: `res = df[(df['cohorte'] == 2022) & (df['probabilidad_desercion'] > 0.3)]`
+
+    2. **Generación automática de reportes académicos**:
+        - Personales: 
+            - "Calcula el promedio de calificaciones del estudiante xxxx."
+                Código: `res = df[df['alumno'] == 'xxxx'][['p1', 'p2', 'p3']].mean(axis=1).mean()`
+        - Grupales:
+            - "Construye una gráfica de barras que muestre la tasa de reprobación de las 10 asignaturas con la tasa más alta."
+                Código: `res = df[df['final'] < 7].groupby('asignatura')['final'].count() / df.groupby('asignatura')['final'].count()`
+                Usa: `create_graph` para generar la gráfica de barras.
+
+    3. **Alertas automáticas**:
+        - "Identifica a los estudiantes que no aprobaron el primer parcial de cálculo vectorial en 202401 y crea un correo invitándoles a recibir apoyo."
+            Realiza: `create_email` para generar el correo personalizado.
+
+    4. **Análisis de tendencias en el rendimiento académico**:
+        - "Lista las asignaturas cuya tasa de reprobación haya aumentado entre el periodo 202303 y 202403."
+            Código: `res = df.groupby(['asignatura', 'periodo'])['final'].apply(lambda x: (x < 7).mean()).unstack().diff(axis=1).loc[:, '202403']`
+
+    ### Recomendaciones para consultas
+    1. **Recomendaciones para la Visualización de Datos**:
+        - El asistente proporcionará recomendaciones sobre los gráficos más adecuados para las consultas del usuario. 
+          Por ejemplo, si el usuario solicita información sobre el promedio de calificaciones, el asistente puede sugerir al final de la consulta las siguientes opciones de gráficos:
+          Gráfico de barras, Gráfico de líneas, Histograma, Gráfico de dispersión, Gráfico de caja, Gráfico de pastel, Gráfico de áreas, Gráfico de barras apiladas, Gráfico de barras horizontales, 
+          Mapa de calor, Gráfico de series temporales, Gráfico de radar, Gráfico de histogramas acumulativos, Gráfico de barras agrupadas, Gráfico de líneas múltiples.
+        - En la recomendación el asistente tiene conocimiento de las graficas utilizadas en matplolib.
+        - las recomendaciones siempre se escriben al final de la consulta.
+        - El numero de recomendaciones de nombres de graficos se debe limitar a 3, pueden ser menos recomendaciones pero deben ser menor o igual a 3 recomendaciones.
+        - las graficas recomendadas deben considerarse adecuadas a la consulta que realizo el usuario.
+        - solo considera recomendar las Graficas cuanto sientas que sea necesario y creas que permitan obtener una mejor respuesta para la visualización de los datos.
+    2. **Recomendaciones para la herramienta consulta_df**:
+        - considera llamar varias vaces la herramienta 'consulta_df' si crees que la consulta necesita varios codigos para que sea repondida adecuadamente.
+    3. **Reomendaciones de herramientas**:
+        - Considera recomendar la herraminenta de 'consulta_df' o 'create_graph' si crees que la respuesta puede ser mejor para visualizarla,
+        en este contexto, visualizarlo mejor con solo datos escritos o visuales con el uso de graficas. 
+         
+    ### Nota:
+    - Para consultas complejas que impliquen cálculos detallados o varias condiciones, desglosa la lógica en pasos claros y comprensibles.
+    - Asegúrate de que todos los cálculos y resultados asignen el valor final a `res` para evitar errores en la ejecución.
+    - puedes utilizar todas las graficas de Matplotlib.
+    - Dale consejos a los usuarios de las graficas que podrian utilizar para visualizar sus datos,
+      por ejemplo si la consulta es de el promedio de calificaciones, puede dar consejos el asistente de utilizar grafica de barras,lineas, histogra,
+      solo da el nombre de las graficas que creas que son mejores para la consulta.
+    - No combines herramientas, si te piden hacer graficas hazlas y solo eso no llames a otras herramientas
+    """
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", template),
+        ("user", "Tu consulta actual es: {input}"),
+        MessagesPlaceholder(variable_name="agent_scratchpad"),
+    ])
+
+    agent = create_tool_calling_agent(llm_chat, tools, prompt=prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tools)
+
+    
+    if prompt := st.chat_input("Escribe tu mensaje aquí..."):
+        # Chat del usuario para el asistente
+        st.session_state["messages"].append({"role": "user", "content": prompt})
+        
+        st.chat_message("user", avatar=avatares["user"]).write(prompt)
+
+
+        # Ejecutar la consulta y guardar la respuesta del asistente
         with st.chat_message("assistant", avatar=avatares["assistant"]):
-            with st.spinner("Thinking..."):
-                time.sleep(2)
+            st_callback = StreamlitCallbackHandler(st.container())
+            # Muestra todo el proceso de lenguaje natural
+            response = agent_executor.invoke(
+                {"input": prompt}, {"callbacks": [st_callback]}
+            )
+            # Asegúrate de que la respuesta esté definida
+            if 'output' in response:
+                message_content = response["output"]
+            else:
+                message_content = "No se obtuvo respuesta del asistente."
 
-            
-            st.write(""" 
-                     La tasa de reprobación de cada asignatura es la siguiente:
+            # Guardar la respuesta del asistente
+            current_graph = st.session_state.get("current_graph", None)
 
-                    - Cálculo diferencial: 41.49%
-                    -  álculo integral: 31.85%
-                    - Cálculo vectorial: 30.91%
-                    - Ecuaciones diferenciales: 27.99%
-                    - Estadística analítica: 19.89%
-                    - Probabilidad y estadística: 29.56%
-                    - Propedéutico de matemáticas para ingenierías: 34.14%
-                    - Álgebra lineal: 28.17%""")
-        
-    elif option == "Generaracion de graficas":
-        st.write("Haz seleccionado Creacion de graficas")
-        
-        st.chat_message("user", avatar=avatares["user"]).write("¿Cuántos estudiantes hay en la tabla?")
-        
-        with st.chat_message("assistant", avatar=avatares["assistant"]):
-            with st.spinner("Thinking..."):
-                time.sleep(2)
-                
-                st.write("Se ha generado la gráfica que muestra el total de alumnos en cada asignatura. ¿Hay algo más en lo que pueda ayudarte?")
-                image_path = "./img/grafica.jpg"  # Reemplaza esto con la ruta de tu imagen
-                st.image(image_path, use_column_width=True)
-                
-    #Mostrar codigo por si lo pide
-    #st.code("""
-    #res = df[(df['asignatura'].str.contains('Matemáticas', case=False)) & (df['final'] < 7)].shape[0] / df[df['asignatura'].str.contains('Matemáticas', case=False)].shape[0]
-    #""", language='python')
+            st.session_state["messages"].append({"role": "assistant", "content": message_content, "graph": current_graph})
+
+            # Mostrar la respuesta del asistente
+            st.write(message_content)
+
+            if current_graph:
+                st.image(current_graph)
+
+            # Limpiar la gráfica actual para no mostrarla en futuros mensajes
+            st.session_state["current_graph"] = None  
     
+        # Comprobar si la bandera está activada para la confirmación de envío de mensajes
+    # print("la bandera es ",st.session_state["bandera"])
+    if st.session_state.get("bandera", False):
+        st.write("¿Confirmar envío de mensajes?")
+        
+        # Botones de confirmación
+        col1, col2 = st.columns([.1, .7])  # Crear dos columnas para los botones
+        with col1:
+            if st.button("Sí", key="confirmar_si"):
+                print("ESTA DENTRO AAAAAAAAAAAAAA")
+                send_email()  # Llamada a la función de envío de email
+                st.success("Has confirmado el envío de mensajes.")
+                st.session_state['bandera'] = False  # Resetear bandera
+
+        with col2:
+            if st.button("No", key="confirmar_no", type="primary"):
+                st.warning("Has cancelado el envío de mensajes.")
+                st.session_state['bandera'] = False  # Resetear bandera
+    
+    
+else:
+        st.error("Por favor, sube primero el archivo CSV para poder interactuar con el asistente.",icon="⚠️")    
+    
+    
+#Mostrar codigo por si lo pide
+#st.code("""
+#res = df[(df['asignatura'].str.contains('Matemáticas', case=False)) & (df['final'] < 7)].shape[0] / df[df['asignatura'].str.contains('Matemáticas', case=False)].shape[0]
+#""", language='python')
+
     
     
 # ----------------------------------------------------------------------------------------------
