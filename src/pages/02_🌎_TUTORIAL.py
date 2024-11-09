@@ -53,7 +53,7 @@ def asistente(consulta_usuario):
     fecha_prueba = datetime.now().date()
     filtro_df_prueba = pd.DataFrame() #dataframe global que guarda los filtros de consulta_df
     mensaje_creado_prueba = "" #str global que guarda el mensaje creado por create_email
-    asunto_creado = "" #str global que guarda el asunto creado por create_email
+    asunto_creado_prueba = "" #str global que guarda el asunto creado por create_email
     #iniciar clave hola si no existe
     if "filtro_df_prueba" not in st.session_state:
         st.session_state["filtro_df_prueba"] = pd.DataFrame()   # Puedes cambiar el valor inicial
@@ -233,7 +233,7 @@ def asistente(consulta_usuario):
                 vacias.append("datos de alumnos")
             if mensaje_creado_prueba == "":
                 vacias.append("mensaje")
-            if asunto_creado == "":
+            if asunto_creado_prueba == "":
                 vacias.append("asunto del mensaje")
             
             st.warning(f"No se encuentran los siguientes datos: {', '.join(vacias)}")
@@ -262,7 +262,7 @@ def asistente(consulta_usuario):
                     em = EmailMessage()
                     em["From"] = email_sender
                     em["To"] = email_reciver
-                    em["Subject"] = asunto_creado
+                    em["Subject"] = asunto_creado_prueba
                     em.set_content(body)
                     smtp.sendmail(email_sender, email_reciver, em.as_string())
             # Para vaciar las variables nuevamente:
@@ -625,26 +625,18 @@ if st.session_state.subpagina == "Introducción":
     st.write("""
     ### **Bienvenido al asistente virtual Pedro**  
     Este asistente está diseñado para ayudarte a consultar y analizar las calificaciones de estudiantes almacenadas en una tabla de datos usando Python con la librería pandas. Aquí tienes una lista de las funcionalidades que puedes utilizar:
+    """)
+    url2 = "https://raw.githubusercontent.com/0VictorRodriguez0/AsistenteAcademico/main/datos_simulados.csv"
 
-    ### Funciones principales:
+    # Leer el archivo CSV desde la URL
+    dfee = pd.read_csv(url2)
+
+    # Seleccionar las primeras 5 filas
+    df_5_filas = dfee.head(5)
     
-    1. **Realizar consultas sobre los datos**:
-        - Puedes pedirle al asistente que realice diferentes tipos de consultas sobre los datos de las calificaciones. 
-        - Ejemplo: _"Muestra los estudiantes reprobados en la asignatura de cálculo."_
-        - Ejemplo: _"¿Cuántos estudiantes han aprobado el primer parcial de ecuaciones diferenciales?"_
-    
-    2. **Generar gráficos**:
-        - Puedes solicitarle al asistente que genere gráficos para visualizar los datos. 
-        - Ejemplo: _"Genera una gráfica de barras de los alumnos reprobados y aprobados en álgebra lineal."_
-        - Ejemplo: _"Muestra un gráfico de líneas con las calificaciones finales de todos los estudiantes en la asignatura de física."_
-
-    3. **Enviar mensajes personalizados**:
-        - El asistente puede generar y enviar mensajes basados en la información de las calificaciones de los estudiantes.
-        - Ejemplo: _"Envía un correo a los estudiantes que reprobaron el segundo parcial de programación."_
-        - Ejemplo: _"Genera un mensaje para informar a los estudiantes sus calificaciones finales en álgebra."_
-
-        
-    ### Instrucciones adicionales:
+    st.write("Mostrando las primeras 5 filas del archivo CSV de ejemplo:")
+    st.dataframe(df_5_filas)
+    st.write("""
     **Variables que maneja el asistente**:
     
     - 'matricula': Identificación única del estudiante.
@@ -657,7 +649,25 @@ if st.session_state.subpagina == "Introducción":
     - 'periodo': Periodo académico de la asignatura.
     - 'num_docente': Identificación del docente.
     - 'docente': Nombre del docente.
-        
+    
+    ### Ejemplos de consultas:
+    
+    1. **Realizar consultas sobre los datos**:
+        - Puedes pedirle al asistente que realice diferentes tipos de consultas sobre los datos de las calificaciones. 
+        - Ejemplo: _"Muestra los estudiantes reprobados en la asignatura de cálculo."_
+        - Ejemplo: _"¿Cuántos estudiantes han aprobado el primer parcial de ecuaciones diferenciales?"_
+    
+    2. **Generar gráficos**:
+        - Puedes solicitarle al asistente que genere gráficos para visualizar los datos. 
+        - Ejemplo: _"Genera una gráfica de barras de los alumnos reprobados y aprobados en ecuaciones diferenciales."_
+        - Ejemplo: _"Genera un gráfico de pastel que muestre la proporción de estudiantes aprobados y reprobados en ecuaciones diferenciales."_
+
+    3. **Enviar mensajes personalizados**:
+        - El asistente puede generar y enviar mensajes basados en la información de las calificaciones de los estudiantes.
+        - Ejemplo: _"Envía un correo a los estudiantes que reprobaron el segundo parcial de programación."_
+        - Ejemplo: _"Genera un mensaje para informar a los estudiantes sus calificaciones finales en álgebra."_
+
+
     ### Ejemplos de consultas comunes:
 
     - _"¿Cuántos estudiantes reprobaron el primer parcial de álgebra?"_
