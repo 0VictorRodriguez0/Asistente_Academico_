@@ -60,7 +60,7 @@ Para almacenar de manera segura las credenciales de la API y el correo electrón
 
     ```plaintext
     OPENAI_API_KEY=sk-exampleAPIkey1234567890abcdef
-    PASSWORD=abcd efgh ijkl mnop
+    PASSWORD="abcd efgh ijkl mnop"
     ```
 
    - `OPENAI_API_KEY` es un ejemplo de la clave de acceso a la API de OpenAI, necesaria para interactuar con sus servicios.
