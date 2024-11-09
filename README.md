@@ -8,7 +8,9 @@ Esta guía proporciona los pasos necesarios para inicializar un entorno virtual 
 - Familiaridad básica con la terminal o línea de comandos.
 
 ## 1. Configuración del Entorno Virtual
-Primero, debes crear y activar un entorno virtual para aislar las dependencias del proyecto. Ejecuta los siguientes comandos en tu terminal:
+Primero, debes crear y activar un entorno virtual para aislar las dependencias del proyecto. 
+Ejecuta los siguientes comandos en tu terminal **dentro de la carpeta** <span style="color:blue">`Asistente_Academico_`</span>:
+
 
 
 1. **Crear un entorno virtual:**
