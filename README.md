@@ -10,11 +10,21 @@ Esta guía proporciona los pasos necesarios para inicializar un entorno virtual 
 ## 1. Configuración del Entorno Virtual
 Primero, debes crear y activar un entorno virtual para aislar las dependencias del proyecto. Ejecuta los siguientes comandos en tu terminal:
 
-```bash
-python -m venv venv
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-.\venv\Scripts\activate
-```
+
+1. **Crear un entorno virtual:**
+    ```bash
+    python -m venv venv
+    ```
+
+2. **Si estás en PowerShell, asegúrate de permitir la ejecución de scripts:**
+    ```bash
+    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+    ```
+
+3. **Activar el entorno virtual:**
+    ```bash
+    .\venv\Scripts\activate
+    ```
 
 
 Al activar el entorno, verás que el prompt de la terminal cambia, indicando que estás trabajando dentro del entorno virtual.
@@ -39,7 +49,7 @@ pip list
 Finalmente, para ejecutar la aplicación y poner en marcha el asistente virtual, utiliza el siguiente comando:
 
 ```bash
-streamlit run '.\src\app.py'
+streamlit run .\src\app.py
 ```
 
 
