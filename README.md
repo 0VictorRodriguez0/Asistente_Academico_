@@ -32,6 +32,7 @@ Una vez que el entorno virtual esté activo, instala las librerías necesarias p
 
 ```bash
 pip install -r requirements.txt
+```
 
 ## 3. Verificar si tus instalaciones fueron correctas
 
@@ -39,6 +40,7 @@ Para asegurarte de que todas las librerías se instalaron correctamente, puedes 
 
 ```bash
 pip list
+```
 
 ## 4. Ejecutar la Aplicación
 
@@ -46,5 +48,6 @@ Finalmente, para ejecutar la aplicación y poner en marcha el asistente virtual,
 
 ```bash
 streamlit run '.\src\app.py'
+```
 
 
