@@ -1,7 +1,7 @@
 # Guía para Configurar el Asistente Virtual en Python
 
 ## Introducción
-Esta guía proporciona los pasos necesarios para inicializar un entorno virtual en Python 3.10.0 y configurar las bibliotecas necesarias para ejecutar un asistente virtual utilizando Streamlit y otras herramientas. Es recomendable usar un entorno virtual para evitar conflictos con las versiones de las bibliotecas instaladas en tu sistema.
+Esta guía proporciona los pasos necesarios para inicializar un entorno virtual en Python 3.11.0 y configurar las bibliotecas necesarias para ejecutar un asistente virtual utilizando Streamlit y otras herramientas. Es recomendable usar un entorno virtual para evitar conflictos con las versiones de las bibliotecas instaladas en tu sistema.
 
 ## Requisitos Previos
 - Asegúrate de tener Python actualizado o una versión superior al 3.11.
