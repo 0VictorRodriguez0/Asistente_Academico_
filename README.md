@@ -51,7 +51,7 @@ pip list
 Finalmente, para ejecutar la aplicación <span style="color:blue">`app.py`</span> y poner en marcha el asistente virtual, utiliza el siguiente comando:
 
 ```bash
-streamlit run .\src\app.py
+streamlit run .\src\Asistente.py
 ```
 
 ## 5. Crear archivo de configuración `.env`

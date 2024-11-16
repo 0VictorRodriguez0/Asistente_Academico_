@@ -318,7 +318,7 @@ def asistente(consulta_usuario):
     st_callback = StreamlitCallbackHandler(st.container())
 
     load_dotenv()
-
+    
     # Configura tu API Key
     openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -402,7 +402,7 @@ def asistente(consulta_usuario):
         tools = [consulta_df, create_graph, create_email]
         tool_node = ToolNode(tools)
 
-        llm_chat = ChatOpenAI(temperature=0, streaming=True)
+        llm_chat = ChatOpenAI(model="gpt-4o", temperature=0, streaming=True)
         #llm_chat = llm_chat.bind_tools(tools)
 
         template = """
@@ -420,6 +420,7 @@ def asistente(consulta_usuario):
         - 'docente': variable categórica con el nombre del profesor.
         - 'año': variable numérica que indica el año en el cual se curso o se esta cursando la asignatura.
         - 'periodo_int': variable numerica que indica el periodo lectivo.
+
         ### la  columna asignatura
         - la base de datos contiene la columna 'asignatura' la cua lcorresponde a una asignatura o materia.
         - una asignatura puede estar escritas con acentos, mayusculas y minusculas.
@@ -428,6 +429,14 @@ def asistente(consulta_usuario):
         df[(df['p1'] < 7) | (df['p2'] < 7)].loc[df['asignatura'].str.contains(remove_accents('Cálculo'), case=False)],
         En el ejemplo se usa remove_accents en la palabra 'Cálculo' para que la búsqueda no se vea afectada por acentos.
 
+        ### la columna clave_asig
+        - la base de datos tiene la columna 'clave_asig' lo cual corresponde a la clave de asignatura.
+        - la forma en como puedes diferenciar entre una clave de asignatura y uan asignatura es por el numero de caracteres,
+        las clave de asignatura siempre tienen 6 caracteres en cual los primeros 2 son letras y los otros son numeros, ejemplo,
+        la clave de asignatura 'IM0101','IZ0263','IX3422','IM0321','PP30402', como puedes ver los anteriroes ejemplos siempre,
+        tienen dos letras y 4 numeros, ademas que significan un codigo y no una materia como puede ser 'calculo','ecuaciones'.
+        - un ejemplo de identificación en una consulta puede ser la siguiente, el usuario solicita las calificaciones de PP0209 de primavera 2023 seccion 1,
+        PP0209 no puede ser una materia, es una clave de asignatura con 2 letras y cuatro numeros por lo cual se tendra que usar la columna 'clave_asig' para buscar la respuesta a la consulta.
 
         ### la columna 'periodo'
         - la base de datos contiene la columna 'periodo' la cual esta conformada por "año" - "periodo del año" - "estación". 
@@ -534,7 +543,7 @@ def asistente(consulta_usuario):
             st.chat_message("user", avatar=avatares["user"]).write(prompt)
 
             # Ejecutar la consulta y guardar la respuesta del asistente
-            with st.chat_message("assistant", avatar=avatares["assistant"]):
+            with st.chat_message("assistant"):
 
                 st_callback = StreamlitCallbackHandler(st.container())
 
@@ -586,109 +595,187 @@ def asistente(consulta_usuario):
     else:
             st.error("Por favor, sube primero el archivo CSV para poder interactuar con el asistente.",icon="⚠️")
 # Inicializar la sesión de estado para almacenar la subpágina actual
+
+# Inicio
+# Define the sections
+secciones = ["Introducción","Datos académicos", "Consultas", "Visualización de datos", "Creación de correos", "Evalúa el Asistente Virtual"]
+
+# Set the default page in session state
 if "subpagina" not in st.session_state:
     st.session_state.subpagina = "Introducción"
 
+# Sidebar navigation
 with st.sidebar:
-    # Menú de subpáginas en la barra lateral
-    secciones = ["Introducción", "Herramientas de consultas", "Herramientas de Gráficas", "Generación automática de reportes académicos"]
-    subpagina = st.sidebar.radio("Selecciona una sección:", secciones, index=secciones.index(st.session_state.subpagina))
-    st.sidebar.markdown("---")
+    subpagina = st.radio("Selecciona una sección:", secciones, index=secciones.index(st.session_state.subpagina))
+    st.session_state.subpagina = subpagina
 
-# Actualizar la sesión de estado con la selección del menú de la barra lateral
-st.session_state.subpagina = subpagina
+def mostrar_botones_navegacion_actual(subpagina_actual):
+    col1, col2 = st.columns([1, .3])
 
-# Función para mostrar los botones de navegación personalizados
-def mostrar_botones_navegacion():
-    col1, col2 = st.columns([1, 0.3])
-
-    # Botón "Anterior" solo si no estamos en la primera página
-    if secciones.index(st.session_state.subpagina) > 0:
+    # Previous and Next buttons based on the current section
+    if subpagina_actual == "Introducción":
+        with col2:
+            if st.button("Siguiente", key="siguiente_introduccion"):
+                st.session_state.subpagina = "Datos académicos"
+                
+    elif subpagina_actual == "Datos académicos":
         with col1:
-            if st.button("Anterior", key=f"anterior_{st.session_state.subpagina}"):
-                st.session_state.subpagina = secciones[secciones.index(st.session_state.subpagina) - 1]
-
-    # Botón "Siguiente" solo si no estamos en la última página
-    if secciones.index(st.session_state.subpagina) < len(secciones) - 1:
+            if st.button("Anterior", key="anterior_datos_academicos"):
+                st.session_state.subpagina = "Introducción"
         with col2:
-            if st.button("Siguiente", key=f"siguiente_{st.session_state.subpagina}"):
-                st.session_state.subpagina = secciones[secciones.index(st.session_state.subpagina) + 1]
-    else:
-        # Botón para ir al formulario de Google Forms en la última página
+            if st.button("Siguiente", key="siguiente_datos_academicos"):
+                st.session_state.subpagina = "Consultas"
+                
+    elif subpagina_actual == "Consultas":
+        with col1:
+            if st.button("Anterior", key="anterior_consultas"):
+                st.session_state.subpagina = "Datos académicos"
         with col2:
-            st.markdown("[Completar evaluación en Google Forms](https://forms.gle/Er45LbbMyApKpPXZ8)", unsafe_allow_html=True)
+            if st.button("Siguiente", key="siguiente_consultas"):
+                st.session_state.subpagina = "Visualización de datos"
+                               
+    elif subpagina_actual == "Visualización de datos":
+        with col1:
+            if st.button("Anterior", key="anterior_visualizacion_datos"):
+                st.session_state.subpagina = "Consultas"
+        with col2:
+            if st.button("Siguiente", key="siguiente_visualizacion_datos"):
+                st.session_state.subpagina = "Creación de correos"
+                
+    elif subpagina_actual == "Creación de correos":
+        with col1:
+            if st.button("Anterior", key="anterior_creacion_correos"):
+                st.session_state.subpagina = "Visualización de datos"
+        with col2:
+            if st.button("Siguiente", key="siguiente_creacion_correos"):
+                st.session_state.subpagina = "Evalúa el Asistente Virtual"
+                
+    elif subpagina_actual == "Evalúa el Asistente Virtual":
+        with col1:
+            if st.button("Anterior", key="anterior_evaluar_asistente"):
+                st.session_state.subpagina = "Creación de correos"
 
 
-# Lógica para mostrar el contenido según la subpágina seleccionada
+# Display content based on the current section
 if st.session_state.subpagina == "Introducción":
-    st.write("# Introducción: ")
+    st.write("# Introducción")
+    st.write("¡Bienvenido al Asistente Virtual para Gestores Académicos! Este asistente emplea tecnología avanzada de procesamiento de lenguaje natural para ofrecerte una experiencia intuitiva en la gestión de datos académicos. Diseñado para responder consultas de manera precisa, generar visualizaciones claras y enviar mensajes personalizados, ¡todo esto mediante lenguaje natural!")
+    st.text("")
+    st.write("El Asistente Académico facilita el análisis de datos en la gestión académica mediante:")
+    st.write("- **Consultas:** Haz cualquier pregunta sobre los datos de tus estudiantes y obtén respuestas al instante. Filtra y accede a la información específica que necesitas en solo unos segundos.")
+    st.write("- **Visualización de Datos:** Transforma tus consultas en gráficos visuales: elige entre gráficos de barras, pastel, líneas y otros formatos. Visualiza el desempeño y tendencias de tus estudiantes de forma clara y atractiva.")
+    st.write("- **Redacta y Envío de Correos Electrónicos:** Redacta correos personalizados basados en los datos de tus estudiantes y envíalos fácilmente a aquellos que elijas.")
+    
+    
+    st.write("En la siguiente sección se hablará sobre los datos académicos utilizados por el asistente, brindándote la oportunidad de comprender la información de la base de datos a utilizar")
+    
+    mostrar_botones_navegacion_actual("Introducción")
+
+elif st.session_state.subpagina == "Datos académicos":
+    st.write("## Datos académicos")
+    st.write("En esta sección, podrás utilizar datos académicos de una base de datos simulada del área de matemáticas. Estos datos permiten al asistente procesar y analizar la información de manera efectiva para responder a tus consultas.")
+    
+    st.write("### Base de datos simulada de calificaciones de alumnos del área de matemáticas.")
+    st.write("En las siguientes columnas se muestran ejemplos de los datos de los estudiantes de diferentes asignaturas, lo que te permitirá explorar mejor la base de datos y comprender su estructura.")
+    # Ecuaciones diferenciales
+    data = pd.DataFrame({
+        'matricula': ['W1OFOONFO', 'W1OFOONGW', 'W1OFOOFN9', 'W1OFOONFW', 'GOOFOOOOW'],
+        'p1': [10, 10, 8, 9, 10],
+        'p2': [10, 9, 10, 10, 10],
+        'p3': [10, 10, 9, 10, 10],
+        'final': [10, 10, 9, 10, 10],
+        'alumno': ['Jennifer Brown', 'Heather Osborne', 'Amy Robinson', 'Frank Green', 'Stephen Mason'],
+        'clave_asig': ['IA0209', 'IA0209', 'IA0209', 'IA0209', 'IA0209'],
+        'asignatura': ['Ecuaciones diferenciales']*5,
+        'seccion': [1]*5,
+        'periodo': ['202101 Primavera']*5,
+        'num_docente': ['GROG']*5,
+        'docente': ['docente GROG']*5
+    })
+    st.write(data)
+    # Cálculo diferencial
+    data2 = pd.DataFrame({
+        'matricula': ['WNOFOOO9F', 'WNOFOOG1O', 'WNOFOOGFN', 'WNOFOOO1N', 'WNOFOOOF3'],
+        'p1': [8, 0, 6, 7, 9],
+        'p2': [7, 0, 5, 7, 8],
+        'p3': [8, 0, 6, 7, 8],
+        'final': [9, 1, 6, 7, 9],
+        'alumno': ['Shannon Bauer', 'Taylor Griffin', 'Rhonda King', 'Krista Brown', 'Robert Webb'],
+        'clave_asig': ['II0106']*5,
+        'asignatura': ['Cálculo diferencial']*5,
+        'seccion': [1]*5,
+        'periodo': ['201403 Otoño']*5,
+        'num_docente': ['GPR2']*5,
+        'docente': ['docente GPR2']*5
+    })
+    st.write(data2)
+    # Cálculo integral
+    data3 = pd.DataFrame({
+        'matricula': ['WGOFOOGNF', 'WFOFOOWOF', 'WGOFOOO1W', 'WGOFOOOOW', 'WGOFOOWN3'],
+        'p1': [6, 6, 6, 3, 2],
+        'p2': [4, 1, 1, 0, 0],
+        'p3': [1, 0, 0, 1, 0],
+        'final': [1, 0, 0, 0, 0],
+        'alumno': ['Terry Taylor', 'Eric Gonzalez', 'Shannon Holland', 'Jorge Glover', 'Richard Cook'],
+        'clave_asig': ['II0209']*5,
+        'asignatura': ['Cálculo integral']*5,
+        'seccion': [1]*5,
+        'periodo': ['201403 Otoño']*5,
+        'num_docente': ['GGPF']*5,
+        'docente': ['docente GGPF']*5
+    })
+    st.write(data3)
+    # Cálculo vectorial
+    data4 = pd.DataFrame({
+        'matricula': ['WGOFOOOG3', 'W3OFOOO3G', 'WNOFOOOGN', 'WNOFOOON3', 'W3OFOOONO'],
+        'p1': [4, 7, 4, 4, 8],
+        'p2': [0, 7, 5, 2, 6],
+        'p3': [1, 7, 5, 4, 8],
+        'final': [0, 8, 3, 3, 7],
+        'alumno': ['Thomas Butler', 'Linda Wagner', 'Adam Garcia', 'Dawn Allen', 'Barry Nguyen'],
+        'clave_asig': ['II0218']*5,
+        'asignatura': ['Cálculo vectorial']*5,
+        'seccion': [1]*5,
+        'periodo': ['201603 Otoño']*5,
+        'num_docente': ['GPR2']*5,
+        'docente': ['docente GPR2']*5
+    })
+    st.write(data4)
+    # Probabilidad y estadística
+    data5 = pd.DataFrame({
+        'matricula': ['WFOFOOWO3', 'WFOFOOWOO', 'WFOFOOON1', 'WGOFOOOGW', 'WFOFOOONO'],
+        'p1': [5, 8, 5, 6, 6],
+        'p2': [5, 7, 6, 8, 3],
+        'p3': [0, 6, 8, 8, 3],
+        'final': [0, 7, 7, 7, 4],
+        'alumno': ['John Thomas', 'Thomas Mahoney', 'Jessica Adams', 'Tina Smith', 'Jessica Klein'],
+        'clave_asig': ['II0319']*5,
+        'asignatura': ['Probabilidad y estadística']*5,
+        'seccion': [4]*5,
+        'periodo': ['201403 Otoño']*5,
+        'num_docente': ['GPR2']*5,
+        'docente': ['docente GPR2']*5
+    })
+
+    # Mostrar en Streamlit
+    st.write(data5)
+    mostrar_botones_navegacion_actual("Datos académicos")
+    
+elif st.session_state.subpagina == "Consultas":
+    st.write("# Herramientas de consultas")
+    st.write("**Explicación:** ")
     st.write("""
-    ### **Bienvenido al asistente virtual Pedro**  
-    Este asistente está diseñado para ayudarte a consultar y analizar las calificaciones de estudiantes almacenadas en una tabla de datos usando Python con la librería pandas. Aquí tienes una lista de las funcionalidades que puedes utilizar:
-    """)
-    url2 = "https://raw.githubusercontent.com/0VictorRodriguez0/AsistenteAcademico/main/datos_simulados.csv"
-
-    # Leer el archivo CSV desde la URL
-    dfee = pd.read_csv(url2)
-
-    # Seleccionar las primeras 5 filas
-    df_5_filas = dfee.head(5)
+            Esta herramienta te ofrece la flexibilidad de hacer preguntas desde lo más básico, como el número de estudiantes aprobados, hasta consultas complejas, como ”Lista a los estudiantes con más de dos años en la universidad y que aún no hayan aprobado el propedéutico de matemáticas o el curso de cálculo diferencial”. Cuanto más detallada sea tu consulta, mejor será la respuesta del asistente.
+             """)
+    st.write("## Casos de uso")
+    st.write("### 1-. Detección temprana de estudiantes en riesgo")
     
-    st.write("Mostrando las primeras 5 filas del archivo CSV de ejemplo:")
-    st.dataframe(df_5_filas)
-    st.write("""
-    **Variables que maneja el asistente**:
-    
-    - 'matricula': Identificación única del estudiante.
-    - 'p1', 'p2', 'p3': Calificaciones de los parciales 1, 2 y 3.
-    - 'final': Calificación final (promedio de p1, p2, p3).
-    - 'alumno': Nombre del estudiante.
-    - 'clave_asig': ID único de la asignatura.
-    - 'asignatura': Nombre de la asignatura.
-    - 'seccion': Sección de la asignatura.
-    - 'periodo': Periodo académico de la asignatura.
-    - 'num_docente': Identificación del docente.
-    - 'docente': Nombre del docente.
-    
-    ### Ejemplos de consultas:
-    
-    1. **Realizar consultas sobre los datos**:
-        - Puedes pedirle al asistente que realice diferentes tipos de consultas sobre los datos de las calificaciones. 
-        - Ejemplo: _"Muestra los estudiantes reprobados en la asignatura de cálculo."_
-        - Ejemplo: _"¿Cuántos estudiantes han aprobado el primer parcial de ecuaciones diferenciales?"_
-    
-    2. **Generar gráficos**:
-        - Puedes solicitarle al asistente que genere gráficos para visualizar los datos. 
-        - Ejemplo: _"Genera una gráfica de barras de los alumnos reprobados y aprobados en ecuaciones diferenciales."_
-        - Ejemplo: _"Genera un gráfico de pastel que muestre la proporción de estudiantes aprobados y reprobados en ecuaciones diferenciales."_
-
-    3. **Enviar mensajes personalizados**:
-        - El asistente puede generar y enviar mensajes basados en la información de las calificaciones de los estudiantes.
-        - Ejemplo: _"Envía un correo a los estudiantes que reprobaron el segundo parcial de programación."_
-        - Ejemplo: _"Genera un mensaje para informar a los estudiantes sus calificaciones finales en álgebra."_
-
-
-    ### Ejemplos de consultas comunes:
-
-    - _"¿Cuántos estudiantes reprobaron el primer parcial de álgebra?"_
-    - _"Genera una gráfica de pastel de los estudiantes aprobados y reprobados en física."_
-    - _"Envía un mensaje a los estudiantes que tienen una calificación final menor a 7 en ecuaciones diferenciales."_  
-
-    Si necesitas más ayuda, simplemente pregunta al asistente sobre lo que quieras consultar o realizar.
-    """)
-    mostrar_botones_navegacion()
-
-    
-if st.session_state.subpagina == "Herramientas de consultas":
-    st.write("# Herramientas de consultas: ")
-    st.write("## Casos de uso: ")
-    st.write("### **1-. Detección temprana de estudiantes en riesgo:**")
-    
-    # Contenedor para la consulta del usuario
+     # Contenedor para la consulta del usuario
     with st.container():
         # Barra de texto para la consulta y botón de envío
         consulta_usuario = st.text_area("Ejemplo de consulta:", 
-                                        value="Lista a los estudiantes que estén cursando alguna asignatura en el periodo actual, 202301, y que hayan reprobado la misma asignatura en periodos previos; además, que en el periodo actual tengan algún parcial reprobado en esa misma asignatura")
+                                        value="¿Cuántos estudiantes reprobaron la asignatura de Cálculo Diferencial?")
+        st.write("⬇️ Presiona 'Enviar' para que el asistente responda.")
         enviar_consulta = st.button("Enviar", key="enviar_consulta")
 
         # Si el usuario hace clic en "Enviar"
@@ -696,119 +783,60 @@ if st.session_state.subpagina == "Herramientas de consultas":
             if enviar_consulta:
                 asistente(consulta_usuario)   
     
-    # Contenedor para la consulta del usuario
-    with st.container():
-        # Barra de texto para la consulta y botón de envío
-        consulta_usuario = st.text_area("Ejemplo de consulta:", 
-                                        value="Muestra los promedios de las secciones de cálculo diferencial en el periodo 202301.")
-        enviar_consulta = st.button("Enviar", key="enviar_consulta_4")
+    st.write("""
+            **Aquí tienes algunas consultas sugeridas para empezar. Sin embargo, también puedes hacer tus propias consultas al asistente:**
+            1. ¿Cuántos estudiantes aprobaron la asignatura de Cálculo Diferencial?
+            2. ¿Cuál es el promedio de calificación final de los estudiantes en la asignatura de Matemáticas?
+            3. ¿Qué estudiantes han obtenido más de 7 en el propedéutico de matemáticas?
+            4. Calcula el promedio de calificaciones del estudiante con matrícula GOOFOOON9
+            5. Calcula el porcentaje de asignaturas que el estudiante GOOFOOON9 ha reprobado.
+             """)
+    mostrar_botones_navegacion_actual("Consultas")
 
-        # Si el usuario hace clic en "Enviar"
-        with st.container(height=310):
-            if enviar_consulta:
-                asistente(consulta_usuario) 
-                
-    # Contenedor para la consulta del usuario
-    with st.container():
-        # Barra de texto para la consulta y botón de envío
-        consulta_usuario = st.text_area("Ejemplo de consulta:", 
-                                        value="¿Cuáles son las tres asignaturas con mayor tasa de reprobación?")
-        enviar_consulta = st.button("Enviar", key="enviar_consulta_5")
-
-        # Si el usuario hace clic en "Enviar"
-        with st.container(height=310):
-            if enviar_consulta:
-                asistente(consulta_usuario)
-                
-                
-    st.write("### **2.	Generación automática de reportes académicos:**")
-    # Contenedor para la consulta del usuario
-    with st.container():
-        # Barra de texto para la consulta y botón de envío
-        consulta_usuario_1 = st.text_area("Ejemplo de consulta:", 
-                                        value="Calcula el promedio de calificaciones del estudiante de matricula GOOFOOON9")
-        enviar_consulta_1 = st.button("Enviar", key="enviar_consulta_1")
-
-        # Si el usuario hace clic en "Enviar"
-        with st.container(height=310):
-            if enviar_consulta_1:
-                asistente(consulta_usuario_1)  
-                
-    # Contenedor para la consulta del usuario
-    with st.container():
-        # Barra de texto para la consulta y botón de envío
-        consulta_usuario_1 = st.text_area("Ejemplo de consulta:", 
-                                        value="¿Cuál ha sido el cambio en el promedio de cada parcial en álgebra durante el periodo 202301?")
-        enviar_consulta_1 = st.button("Enviar", key="enviar_consulta_6")
-
-        # Si el usuario hace clic en "Enviar"
-        with st.container(height=310):
-            if enviar_consulta_1:
-                asistente(consulta_usuario_1) 
-                
-    mostrar_botones_navegacion()
-            
-            
-elif st.session_state.subpagina == "Herramientas de Gráficas":
-    st.write("# Herramientas de Gráficas: ")
-    st.write("## Casos de uso: ")
-    st.write("### **1-. Generación automática de reportes académicos**")
+elif st.session_state.subpagina == "Visualización de datos":
+    st.write("# Visualización de datos")
+    st.write("**Explicación:** ")
+    st.write("""
+            La herramienta de gráficas permite generar visualizaciones claras y dinámicas. Puedes pedir diferentes tipos de gráficos, y el asistente extraerá la información correspondiente de la base de datos para representar de manera visual los datos sobre calificaciones, rendimiento o cualquier otro análisis que necesites.
+            """)
+    st.write("## Casos de uso")
+    st.write("### 1-. Generación automática de reportes académicos")
+    
     with st.container():
         # Barra de texto para la consulta y botón de envío
         consulta_usuario_2 = st.text_area("Ejemplo de consulta:", 
-                                        value="Construye una gráfica de barras que muestre la tasa de reprobación de las asignaturas, ordenadas descendentemente. Muestra solamente las 10 asignaturas con la tasa de reprobación más alta.")
+                                        value="Genera una gráfica de barras que muestre la distribución de las calificaciones finales de los estudiantes en la asignatura de Cálculo Diferencial.")
+        st.write("⬇️ Presiona 'Enviar' para que el asistente responda.")
         enviar_consulta_2 = st.button("Enviar", key="enviar_consulta_2")
 
         # Si el usuario hace clic en "Enviar"
-        with st.container(height=310):
-            if enviar_consulta_2:
-                asistente(consulta_usuario_2)
-                
-    with st.container():
-        # Barra de texto para la consulta y botón de envío
-        consulta_usuario_2 = st.text_area("Ejemplo de consulta:", 
-                                        value="Compara, mediante gráficas de caja paralelas, la distribución de las calificaciones en las secciones de cálculo integral en el periodo 202303. ")
-        enviar_consulta_2 = st.button("Enviar", key="enviar_consulta_8")
-
-        # Si el usuario hace clic en "Enviar"
-        with st.container(height=310):
-            if enviar_consulta_2:
-                asistente(consulta_usuario_2)
-                
-    with st.container():
-        # Barra de texto para la consulta y botón de envío
-        consulta_usuario_2 = st.text_area("Ejemplo de consulta:", 
-                                        value="Construye una serie de tiempo de la tasa de reprobación en la asignatura de ecuaciones diferenciales en cada periodo lectivo.")
-        enviar_consulta_2 = st.button("Enviar", key="enviar_consulta_7")
-
-        # Si el usuario hace clic en "Enviar"
-        with st.container(height=310):
+        with st.container(height=500):
             if enviar_consulta_2:
                 asistente(consulta_usuario_2)
                 
                 
-    st.write("### **2-. Generación automática de reportes académicos**")
-    with st.container():
-        # Barra de texto para la consulta y botón de envío
-        consulta_usuario_3 = st.text_area("Ejemplo de consulta:", 
-                                        value="Compara la distribución de calificaciones, obtenidas en el periodo 202301, correspondientes a las asignaturas de cálculo diferencial, cálculo integral y ecuaciones diferenciales. Emplea gráficas de caja paralelas.")
-        enviar_consulta_3 = st.button("Enviar", key="enviar_consulta_3")
+    st.write("""
+            **Aquí tienes algunas consultas sugeridas para empezar. Sin embargo, también puedes hacer tus propias consultas al asistente:**
+            1. Genera un gráfico que muestre la cantidad de estudiantes en distintos rangos de calificación final en la asignatura de Álgebra Lineal.
+            2. Muestra un histograma de frecuencias con la distribución de calificaciones de cálculo diferencial.
+            3. Crea un gráfico de líneas que muestre la evolución de las calificaciones promedio de los estudiantes en los tres parciales de la asignatura de Matemáticas.
+            4. Crea una gráfica con el rendimiento de los estudiantes en los tres parciales de la asignatura de  Probabilidad y Estadística.
+            5. Crea un gráfico de barras para mostrar el promedio de calificaciones finales de los estudiantes de cada docente en la asignatura de Estadística analítica .
+             """)            
+    mostrar_botones_navegacion_actual("Visualización de datos")
 
-        # Si el usuario hace clic en "Enviar"
-        with st.container(height=310):
-            if enviar_consulta_3:
-                asistente(consulta_usuario_3)
-    
-    mostrar_botones_navegacion()
-                    
-elif st.session_state.subpagina == "Generación automática de reportes académicos":
-    st.write("# Generación automática de reportes académicos: ")
-    st.write("## Casos de uso: ")
-    st.write("### **1-. Alertas automáticas sobre el rendimiento académico:**")
+elif st.session_state.subpagina == "Creación de correos":
+    st.write("# Creación de correos")
+    st.write("**Explicación:** ")
+    st.write("""
+            El asistente utiliza los datos de los estudiantes, como sus calificaciones o cualquier característica específica, para identificar a un grupo o estudiantes individuales. Luego, puedes pedirle al asistente que genere un mensaje personalizado para ese grupo y lo envíe por correo electrónico. Es importante contar con los datos de los estudiantes, ya que, por ejemplo, con su matrícula (ejemplo 111222333), el asistente podrá generar un correo a la dirección correspondiente: 111222333@ucaribe.edu.mx.""")
+    st.write("## Casos de uso")
+    st.write("### 1-. Alertas automáticas sobre el rendimiento académico")
     with st.container():
         # Barra de texto para la consulta y botón de envío
         consulta_usuario_4 = st.text_area("Ejemplo de consulta:", 
-                                        value="Lista a los estudiantes que hayan reprobado una o más asignaturas en el periodo (202303). Escribe un correo electrónico invitándoles a reunirse con algún profesor de la academia de matemáticas para recibir una tutoría académica. Muéstrame el correo para aprobarlo antes de que lo envíes.")
+                                        value="Crea un correo a los estudiantes que reprobaron la asignatura de Álgebra con su calificación final.")
+        st.write("⬇️ Presiona 'Enviar' para que el asistente responda.")
         enviar_consulta_4 = st.button("Enviar", key="enviar_consulta_3")
 
         # Si el usuario hace clic en "Enviar"
@@ -816,6 +844,39 @@ elif st.session_state.subpagina == "Generación automática de reportes académi
             if enviar_consulta_4:
                 asistente(consulta_usuario_4)
     
-    mostrar_botones_navegacion()
-                  
-        
+    st.write("""
+            **Aquí tienes algunas consultas sugeridas para empezar. Sin embargo, también puedes hacer tus propias consultas al asistente:**
+            1. Genera un reporte y envía el correo para los estudiantes que no han aprobado el primer parcial en la asignatura de Cálculo Diferencial.
+            2. Crea un correo a los estudiantes con calificación final superior a 9 en la asignatura de Calculo Integral.
+            3. Crea un correo a los estudiantes que aprobaron la asignatura de Álgebra con su calificación final.
+            4. Crea un correo a los estudiantes de la asignatura de Calculo Diferencial informándoles sobre su rendimiento general en los tres parciales.
+            5. Genera un reporte y envía el correo con los estudiantes que están en riesgo de reprobación en la asignatura de Calculo Vectorial, según su calificación actual.
+             """)   
+    
+    mostrar_botones_navegacion_actual("Creación de correos")
+    
+elif st.session_state.subpagina == "Evalúa el Asistente Virtual":
+    st.write("# Evalúa el Asistente Virtual")
+    st.write("Tu opinión es importante para nosotros. Por favor, utiliza el siguiente enlace para compartir tu evaluación sobre el asistente virtual:")
+
+    # Display the evaluation link as a styled button
+    evaluation_link = "https://forms.gle/hvj2EJL8WgPFbfRTA"
+    st.markdown(
+        f"""
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="{evaluation_link}" target="_blank" style="
+                background-color: #4CAF50;
+                color: white;
+                padding: 12px 24px;
+                font-size: 18px;
+                border-radius: 8px;
+                text-decoration: none;
+                display: inline-block;
+            ">🔗 Evaluar Asistente Virtual</a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Show navigation buttons for this section
+    mostrar_botones_navegacion_actual("Evalúa el Asistente Virtual")

@@ -459,12 +459,13 @@ if st.session_state["file_uploaded"]:
     - 'alumno': variable categórica con el nombre del estudiante.
     - 'clave_asig': variable categórica que indica un ID para una asignatura.
     - 'asignatura': variable categórica con el nombre de la asignatura.
-    - 'seccion': variable categórica que indica la sección de la asignatura.
+    - 'seccion': variable numerica que indica la sección de la asignatura.
     - 'periodo': variable categórica que indica el periodo lectivo.
     - 'num_docente': variable categórica que identifica al profesor de la asignatura.
     - 'docente': variable categórica con el nombre del profesor.
     - 'año': variable numérica que indica el año en el cual se curso o se esta cursando la asignatura.
     - 'periodo_int': variable numerica que indica el periodo lectivo.
+
     ### la  columna asignatura
     - la base de datos contiene la columna 'asignatura' la cua lcorresponde a una asignatura o materia.
     - una asignatura puede estar escritas con acentos, mayusculas y minusculas.
@@ -472,6 +473,16 @@ if st.session_state["file_uploaded"]:
       Por ejemplo, si el usuario desea conocer los alumnos reprobados en los parciales 1 y 2 de cálculo, el código sería:
       df[(df['p1'] < 7) | (df['p2'] < 7)].loc[df['asignatura'].str.contains(remove_accents('Cálculo'), case=False)],
       En el ejemplo se usa remove_accents en la palabra 'Cálculo' para que la búsqueda no se vea afectada por acentos.
+    
+    ### la columna clave_asig
+    - la base de datos tiene la columna 'clave_asig' lo cual corresponde a la clave de asignatura.
+    - la forma en como puedes diferenciar entre una clave de asignatura y uan asignatura es por el numero de caracteres,
+    las clave de asignatura siempre tienen 6 caracteres en cual los primeros 2 son letras y los otros son numeros, ejemplo,
+    la clave de asignatura 'IM0101','IZ0263','IX3422','IM0321','PP30402', como puedes ver los anteriroes ejemplos siempre,
+    tienen dos letras y 4 numeros, ademas que significan un codigo y no una materia como puede ser 'calculo','ecuaciones'.
+    - un ejemplo de identificación en una consulta puede ser la siguiente, el usuario solicita las calificaciones de PP0209 de primavera 2023 seccion 1,
+    PP0209 no puede ser una materia, es una clave de asignatura con 2 letras y cuatro numeros por lo cual se tendra que usar la columna 'clave_asig' para buscar la respuesta a la consulta.
+
 
 
     ### la columna 'periodo'
@@ -506,6 +517,7 @@ if st.session_state["file_uploaded"]:
     2. **Gráficos**:
         - Usa `create_graph` para generar gráficos. Indica el tipo de gráfico (barras, histogramas, cajas, series de tiempo) y asegúrate de que sea adecuado para el análisis solicitado.
         - Ejemplo: si se requiere una gráfica de barras que muestre la tasa de reprobación, usa `create_graph` para construir dicha gráfica.
+        - 
 
     3. **Correos Electrónicos**:
         - Usa `create_email` cuando se mencione explícitamente la creación o envío de correos electrónicos, o si el usuario hace referencia a contactar a alguien.
